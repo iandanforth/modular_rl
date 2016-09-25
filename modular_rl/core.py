@@ -1,33 +1,44 @@
-import numpy as np, time, itertools
+
+# Standard Library
+import time
+import itertools
 from collections import OrderedDict
-from .misc_utils import *
-from . import distributions
-concat = np.concatenate
-import theano.tensor as T, theano
 from importlib import import_module
+
+# Third Party
 import scipy.optimize
-from .keras_theano_setup import floatX, FNOPTS
+import theano
+import theano.tensor as T
+import numpy as np
+concat = np.concatenate
 from keras.layers.core import Layer
 
+# Local
+from .misc_utils import *
+from . import distributions
+from .keras_theano_setup import floatX, FNOPTS
+
 # ================================================================
-# Make agent 
+# Make agent
 # ================================================================
 
 def get_agent_cls(name):
+    # Split name
+    # e.g. modular_rl.agentzoo.TrpoAgent -> [modular_rl, agentzoo.TrpoAgent]
     p, m = name.rsplit('.', 1)
     mod = import_module(p)
     constructor = getattr(mod, m)
     return constructor
 
 # ================================================================
-# Stats 
+# Stats
 # ================================================================
 
 def add_episode_stats(stats, paths):
     reward_key = "reward_raw" if "reward_raw" in paths[0] else "reward"
     episoderewards = np.array([path[reward_key].sum() for path in paths])
     pathlengths = np.array([pathlength(path) for path in paths])
- 
+
     stats["EpisodeRewards"] = episoderewards
     stats["EpisodeLengths"] = pathlengths
     stats["NumEpBatch"] = len(episoderewards)
@@ -43,7 +54,7 @@ def add_prefixed_stats(stats, prefix, d):
         stats[prefix+"_"+k] = v
 
 # ================================================================
-# Policy Gradients 
+# Policy Gradients
 # ================================================================
 
 def compute_advantage(vf, paths, gamma, lam):
@@ -52,9 +63,9 @@ def compute_advantage(vf, paths, gamma, lam):
         path["return"] = discount(path["reward"], gamma)
         b = path["baseline"] = vf.predict(path)
         b1 = np.append(b, 0 if path["terminated"] else b[-1])
-        deltas = path["reward"] + gamma*b1[1:] - b1[:-1] 
+        deltas = path["reward"] + gamma*b1[1:] - b1[:-1]
         path["advantage"] = discount(deltas, gamma * lam)
-    alladv = np.concatenate([path["advantage"] for path in paths])    
+    alladv = np.concatenate([path["advantage"] for path in paths])
     # Standardize advantage
     std = alladv.std()
     mean = alladv.mean()
@@ -149,12 +160,12 @@ def do_rollouts_serial(env, agent, timestep_limit, n_timesteps, seed_iter):
 def pathlength(path):
     return len(path["action"])
 
-def animate_rollout(env, agent, n_timesteps,delay=.01):
+def animate_rollout(env, agent, n_timesteps, delay=.01):
     ob = env.reset()
     env.render()
     for i in xrange(n_timesteps):
-        a, _info = agent.act(ob)
-        (ob, _rew, done, _info) = env.step(a)
+        a, _ = agent.act(ob)
+        (_, _, done, _) = env.step(a)
         env.render()
         if done:
             print("terminated after %s timesteps"%i)
@@ -162,7 +173,7 @@ def animate_rollout(env, agent, n_timesteps,delay=.01):
         time.sleep(delay)
 
 # ================================================================
-# Stochastic policies 
+# Stochastic policies
 # ================================================================
 
 class StochPolicy(object):
@@ -213,7 +224,7 @@ class StochPolicyKeras(StochPolicy, EzPickle):
         return self._probtype
     @property
     def net(self):
-        return self._net    
+        return self._net
     @property
     def trainable_variables(self):
         return self._net.trainable_weights
@@ -304,7 +315,7 @@ class DiagGauss(ProbType):
         std_nd = prob[:, self.d:]
         return T.log(std_nd).sum(axis=1) + .5 * np.log(2 * np.pi * np.e) * self.d
     def sample(self, prob):
-        mean_nd = prob[:, :self.d] 
+        mean_nd = prob[:, :self.d]
         std_nd = prob[:, self.d:]
         return np.random.randn(prob.shape[0], self.d).astype(floatX) * std_nd + mean_nd
     def maxprob(self, prob):
@@ -353,7 +364,7 @@ def validate_probtype(probtype, prob):
 
 
 # ================================================================
-# Value functions 
+# Value functions
 # ================================================================
 
 class Baseline(object):
@@ -416,7 +427,7 @@ class NnRegression(EzPickle):
         out["PredStdevBefore"] = ypredold_ny.std()
         out["PredStdevAfter"] = yprednew_ny.std()
         out["TargStdev"] = ytarg_ny.std()
-        if nY==1: 
+        if nY==1:
             out["EV_before"] =  explained_variance_2d(ypredold_ny, ytarg_ny)[0]
             out["EV_after"] =  explained_variance_2d(yprednew_ny, ytarg_ny)[0]
         else:
@@ -462,7 +473,7 @@ class NnCpd(EzPickle):
 
 class SetFromFlat(object):
     def __init__(self, var_list):
-        
+
         theta = T.vector()
         start = 0
         updates = []
@@ -494,7 +505,7 @@ class LbfgsOptimizer(EzFlat):
     def __init__(self, loss,  params, symb_args, extra_losses=None, maxiter=25):
         EzFlat.__init__(self, params)
         self.all_losses = OrderedDict()
-        self.all_losses["loss"] = loss        
+        self.all_losses["loss"] = loss
         if extra_losses is not None:
             self.all_losses.update(extra_losses)
         self.f_lossgrad = theano.function(list(symb_args), [loss, flatgrad(loss, params)],**FNOPTS)
@@ -517,7 +528,7 @@ class LbfgsOptimizer(EzFlat):
         info = OrderedDict()
         for (name,lossbefore, lossafter) in zip(self.all_losses.keys(), losses_before, losses_after):
             info[name+"_before"] = lossbefore
-            info[name+"_after"] = lossafter        
+            info[name+"_after"] = lossafter
         return info
 
 def numel(x):
@@ -528,7 +539,7 @@ def flatgrad(loss, var_list):
     return T.concatenate([g.flatten() for g in grads])
 
 # ================================================================
-# Keras 
+# Keras
 # ================================================================
 
 class ConcatFixedStd(Layer):
@@ -552,7 +563,7 @@ class ConcatFixedStd(Layer):
         return T.concatenate([Mean, Std], axis=1)
 
 # ================================================================
-# Video monitoring 
+# Video monitoring
 # ================================================================
 
 def VIDEO_NEVER(_):

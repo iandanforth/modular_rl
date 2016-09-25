@@ -24,7 +24,7 @@ def discount(x, gamma):
 
     """
     assert x.ndim >= 1
-    return scipy.signal.lfilter([1],[1,-gamma],x[::-1], axis=0)[::-1]
+    return scipy.signal.lfilter([1], [1,-gamma], x[::-1], axis=0)[::-1]
 
 def explained_variance(ypred,y):
     """
@@ -39,7 +39,7 @@ def explained_variance(ypred,y):
     """
     assert y.ndim == 1 and ypred.ndim == 1
     vary = np.var(y)
-    return np.nan if vary==0 else 1 - np.var(y-ypred)/vary
+    return np.nan if vary == 0 else 1 - np.var(y-ypred) / vary
 
 def explained_variance_2d(ypred, y):
     assert y.ndim == 2 and ypred.ndim == 2
@@ -65,22 +65,27 @@ def update_default_config(tuples, usercfg):
     dict2 with updated configuration
     """
     out = dict2()
-    for (name,_,defval,_) in tuples:
+    for (name, _, defval, _) in tuples:
         out[name] = defval
     if usercfg:
-        for (k,v) in usercfg.iteritems():
+        for (k, v) in usercfg.iteritems():
             if k in out:
                 out[k] = v
     return out
 
 def update_argument_parser(parser, options, **kwargs):
     kwargs = kwargs.copy()
-    for (name,typ,default,desc) in options:
+    for (name, typ, default, desc) in options:
         flag = "--"+name
-        if flag in parser._option_string_actions.keys(): #pylint: disable=W0212
+        if flag in parser._option_string_actions.keys():
             print("warning: already have option %s. skipping"%name)
         else:
-            parser.add_argument(flag, type=typ, default=kwargs.pop(name,default), help=desc or " ")
+            parser.add_argument(
+                flag,
+                type=typ,
+                default=kwargs.pop(name, default),
+                help=desc or " "
+            )
     if kwargs:
         raise ValueError("options %s ignored"%kwargs)
 
@@ -94,13 +99,13 @@ def IDENTITY(x):
     return x
 
 GENERAL_OPTIONS = [
-    ("seed",int,0,"random seed"),
-    ("metadata",str,"","metadata about experiment"),
-    ("outfile",str,"/tmp/a.h5","output file"),
-    ("use_hdf",int,0,"whether to make an hdf5 file with results and snapshots"),
-    ("snapshot_every",int,0,"how often to snapshot"),
-    ("load_snapshot",str,"","path to snapshot"),
-    ("video",int,1,"whether to record video")
+    ("seed", int, 0, "random seed"),
+    ("metadata", str, "", "metadata about experiment"),
+    ("outfile", str, "/tmp/a.h5", "output file"),
+    ("use_hdf", int, 0, "whether to make an hdf5 file with results and snapshots"),
+    ("snapshot_every", int, 0, "how often to snapshot"),
+    ("load_snapshot", str, "", "path to snapshot"),
+    ("video", int, 1, "whether to record video")
 ]
 
 # ================================================================
